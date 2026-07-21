@@ -37,14 +37,14 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (!session) return;
 
-    if (!session.currentPlayer && !session.isLoadingSession) {
-      session.hydratePlayerSession().then(() => {
-        if (!session.currentPlayer) {
-          router.push("/login");
-        }
-      });
+    if (session.isLoadingSession) {
+      return;
     }
-  }, []);
+
+    if (!session.currentPlayer) {
+      router.push("/login");
+    }
+  }, [router, session, session?.currentPlayer, session?.isLoadingSession]);
 
   const { data: vaultEntries, isLoading: vaultLoading } = useQuery<GameProduct[]>({
     queryKey: ["vault"],
@@ -58,10 +58,13 @@ export default function AdminDashboard() {
     refetchInterval: 8000,
   });
 
-  const totalRevenue = orderLog?.reduce((acc, o) => acc + o.grandTotal, 0) ?? 0;
-  const pendingCount = orderLog?.filter((o) => o.deliveryState === "pending").length ?? 0;
-  const totalTitles  = vaultEntries?.length ?? 0;
-  const totalStock   = vaultEntries?.reduce((acc, g) => acc + g.availableKeys, 0) ?? 0;
+  const safeVault = Array.isArray(vaultEntries) ? vaultEntries : [];
+  const safeOrders = Array.isArray(orderLog) ? orderLog : [];
+
+  const totalRevenue = safeOrders.reduce((acc, o) => acc + o.grandTotal, 0);
+  const pendingCount = safeOrders.filter((o) => o.deliveryState === "pending").length;
+  const totalTitles  = safeVault.length;
+  const totalStock   = safeVault.reduce((acc, g) => acc + g.availableKeys, 0);
 
   return (
     <div className="min-h-screen" style={{ background: "var(--gk-void)" }}>
@@ -121,7 +124,7 @@ export default function AdminDashboard() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {vaultEntries?.map((game: GameProduct) => {
+              {safeVault.map((game: GameProduct) => {
                 const pBadge = platformBadgeStyle[game.platform] ?? {
                   bg: "rgba(255,255,255,0.08)",
                   color: "#ccc",
@@ -190,7 +193,7 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {orderLog?.map((order: PurchaseOrder) => {
+                  {safeOrders.map((order: PurchaseOrder) => {
                     const ds = deliveryStateStyle[order.deliveryState] ?? {
                       bg: "rgba(255,255,255,0.08)",
                       color: "#ccc",
@@ -228,7 +231,7 @@ export default function AdminDashboard() {
                 </tbody>
               </table>
 
-              {(!orderLog || orderLog.length === 0) && (
+              {safeOrders.length === 0 && (
                 <div className="text-center py-12" style={{ color: "var(--gk-muted)" }}>
                   No purchase orders have been recorded yet.
                 </div>

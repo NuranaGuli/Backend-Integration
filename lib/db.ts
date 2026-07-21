@@ -1,3 +1,4 @@
+import { createHash, randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import Database from "better-sqlite3";
@@ -38,6 +39,14 @@ export const playerAccountsTable = sqliteTable("player_accounts", {
   accountTier: text("accountTier").notNull(),
 });
 
+export const authSessionsTable = sqliteTable("auth_sessions", {
+  id: text("id").primaryKey(),
+  accountId: text("accountId").notNull(),
+  tokenHash: text("tokenHash").notNull().unique(),
+  expiresAt: integer("expiresAt").notNull(),
+  createdAt: integer("createdAt").notNull(),
+});
+
 export interface GameProduct {
   id: string;
   title: string;
@@ -65,6 +74,14 @@ export interface PlayerAccount {
   accountTier: string;
 }
 
+export interface AuthSession {
+  id: string;
+  accountId: string;
+  tokenHash: string;
+  expiresAt: number;
+  createdAt: number;
+}
+
 function generateNextId(prefix: string, existingItems: Array<{ id: string }>): string {
   const highestSuffix = existingItems.reduce((max, item) => {
     const match = item.id.match(new RegExp(`^${prefix}(\\d+)$`));
@@ -77,6 +94,10 @@ function generateNextId(prefix: string, existingItems: Array<{ id: string }>): s
   }, 0);
 
   return `${prefix}${highestSuffix + 1}`;
+}
+
+function hashSessionToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
 }
 
 function initializeDatabase() {
@@ -106,6 +127,14 @@ function initializeDatabase() {
       playerEmail TEXT NOT NULL UNIQUE,
       hashedSecurityKey TEXT NOT NULL,
       accountTier TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS auth_sessions (
+      id TEXT PRIMARY KEY,
+      accountId TEXT NOT NULL,
+      tokenHash TEXT NOT NULL UNIQUE,
+      expiresAt INTEGER NOT NULL,
+      createdAt INTEGER NOT NULL
     );
   `);
 
@@ -317,4 +346,46 @@ export function createPlayerAccount(input: Omit<PlayerAccount, "id">): PlayerAcc
 
   db.insert(playerAccountsTable).values(newAccount).run();
   return newAccount;
+}
+
+export function createAuthSession(accountId: string, token: string, expiresAt: number): AuthSession {
+  const newSession: AuthSession = {
+    id: randomUUID(),
+    accountId,
+    tokenHash: hashSessionToken(token),
+    expiresAt,
+    createdAt: Date.now(),
+  };
+
+  db.insert(authSessionsTable).values(newSession).run();
+  return newSession;
+}
+
+export function getAuthSessionByToken(token: string): AuthSession | undefined {
+  const tokenHash = hashSessionToken(token);
+  const session = db.select().from(authSessionsTable).where(eq(authSessionsTable.tokenHash, tokenHash)).get() as
+    | AuthSession
+    | undefined;
+
+  if (!session) {
+    return undefined;
+  }
+
+  if (session.expiresAt <= Date.now()) {
+    deleteAuthSessionById(session.id);
+    return undefined;
+  }
+
+  return session;
+}
+
+export function deleteAuthSessionByToken(token: string): boolean {
+  const tokenHash = hashSessionToken(token);
+  const affectedRows = db.delete(authSessionsTable).where(eq(authSessionsTable.tokenHash, tokenHash)).run();
+  return affectedRows.changes > 0;
+}
+
+export function deleteAuthSessionById(id: string): boolean {
+  const affectedRows = db.delete(authSessionsTable).where(eq(authSessionsTable.id, id)).run();
+  return affectedRows.changes > 0;
 }

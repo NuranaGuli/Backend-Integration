@@ -1,17 +1,20 @@
 "use client";
 
 import { dispatchGameListing } from "@/app/actions/vaultManager";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 export default function LicenseIngestionPanel() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [isPanelVisible, setIsPanelVisible] = useState(false);
 
   const handleListingSubmission = async (formData: FormData) => {
     const outcome = await dispatchGameListing(formData);
     if (outcome?.committed) {
       setIsPanelVisible(false);
+      queryClient.invalidateQueries({ queryKey: ["vault"] });
       router.refresh();
     }
   };

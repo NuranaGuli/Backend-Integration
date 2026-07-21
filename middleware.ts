@@ -1,12 +1,9 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { jwtVerify } from "jose";
+import jwt from "jsonwebtoken";
 
 export const middleware = async (request: NextRequest) => {
-  const signingKey = new TextEncoder().encode(
-    process.env.JWT_SECRET ?? "cyberkey_gg_secret"
-  );
-
+  const signingSecret = process.env.JWT_SECRET ?? "cyberkey_gg_secret";
   const sessionToken = request.cookies.get("gk_token")?.value;
 
   if (!sessionToken) {
@@ -17,7 +14,7 @@ export const middleware = async (request: NextRequest) => {
   }
 
   try {
-    await jwtVerify(sessionToken, signingKey);
+    jwt.verify(sessionToken, signingSecret);
     return NextResponse.next();
   } catch {
     return NextResponse.json(
@@ -32,6 +29,5 @@ export const config = {
     "/api/vault/:path*",
     "/api/orders/:path*",
     "/api/allocation/:path*",
-    "/dashboard",
   ],
 };

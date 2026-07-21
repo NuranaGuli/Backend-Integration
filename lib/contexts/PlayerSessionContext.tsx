@@ -3,8 +3,8 @@
 import {
   createContext,
   useContext,
+  useEffect,
   useState,
-  useTransition,
   ReactNode,
 } from "react";
 import { terminateActiveSession } from "@/app/actions/authActions";
@@ -27,42 +27,59 @@ const PlayerSessionContext = createContext<PlayerSessionShape | null>(null);
 
 export function PlayerSessionProvider({ children }: { children: ReactNode }) {
   const [currentPlayer, setCurrentPlayer] = useState<PlayerProfile | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [isLoadingSession, setIsLoadingSession] = useState(true);
 
   const mountPlayerSession = (profile: PlayerProfile) => {
     setCurrentPlayer(profile);
+    setIsLoadingSession(false);
   };
 
   const hydratePlayerSession = async () => {
-    const response = await fetch("/api/auth/me");
-    if (!response.ok) {
-      setCurrentPlayer(null);
-      return;
+    setIsLoadingSession(true);
+
+    try {
+      const response = await fetch("/api/auth/me");
+      if (!response.ok) {
+        setCurrentPlayer(null);
+        return;
+      }
+
+      const data = (await response.json()) as {
+        id: string;
+        playerEmail: string;
+        accountTier: string;
+      };
+
+      setCurrentPlayer({
+        accountId: data.id,
+        playerEmail: data.playerEmail,
+        accountTier: data.accountTier,
+      });
+    } finally {
+      setIsLoadingSession(false);
     }
-    const data = (await response.json()) as {
-      id: string;
-      playerEmail: string;
-      accountTier: string;
-    };
-    setCurrentPlayer({
-      accountId: data.id,
-      playerEmail: data.playerEmail,
-      accountTier: data.accountTier,
-    });
   };
 
+  useEffect(() => {
+    void hydratePlayerSession();
+  }, []);
+
   const revokePlayerSession = async () => {
-    startTransition(async () => {
+    setIsLoadingSession(true);
+
+    try {
       await terminateActiveSession();
       setCurrentPlayer(null);
-    });
+    } finally {
+      setIsLoadingSession(false);
+    }
   };
 
   return (
     <PlayerSessionContext.Provider
       value={{
         currentPlayer,
-        isLoadingSession: isPending,
+        isLoadingSession,
         mountPlayerSession,
         hydratePlayerSession,
         revokePlayerSession,

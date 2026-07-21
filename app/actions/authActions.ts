@@ -7,7 +7,7 @@ import {
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { cookies } from "next/headers";
-import { createPlayerAccount, getPlayerAccountByEmail } from "@/lib/db";
+import { createAuthSession, createPlayerAccount, getPlayerAccountByEmail, deleteAuthSessionByToken } from "@/lib/db";
 
 type RegistrationResult =
   | { registered: true }
@@ -107,10 +107,14 @@ export const executePlayerSignIn = async (
     { expiresIn: "7d" }
   );
 
+  const sessionExpiresAt = Date.now() + 1000 * 60 * 60 * 24 * 7;
+  createAuthSession(resolvedAccount.id, sessionToken, sessionExpiresAt);
+
   const cookieStore = await cookies();
   cookieStore.set("gk_token", sessionToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
     maxAge: 60 * 60 * 24 * 7,
     path: "/",
   });
@@ -126,6 +130,12 @@ export const executePlayerSignIn = async (
 export const terminateActiveSession =
   async (): Promise<SessionTerminationResult> => {
     const cookieStore = await cookies();
+    const sessionToken = cookieStore.get("gk_token")?.value;
+
+    if (sessionToken) {
+      deleteAuthSessionByToken(sessionToken);
+    }
+
     cookieStore.delete("gk_token");
     return { terminated: true };
   };

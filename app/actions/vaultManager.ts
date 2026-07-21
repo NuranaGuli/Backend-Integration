@@ -1,5 +1,6 @@
 "use server";
 
+import { createGame } from "@/lib/db";
 import { gameProducts } from "@/lib/gameVault";
 import { z } from "zod";
 
@@ -45,11 +46,8 @@ export const dispatchGameListing = async (formData: FormData) => {
     return { committed: false, violations: schemaCheck.error.issues };
   }
 
-  const freshListing: typeof gameProducts[number] = {
-    id: `gp${gameProducts.length + 1}`,
-    ...schemaCheck.data,
-  };
+  const freshListing = createGame(schemaCheck.data);
+  gameProducts.push({ ...freshListing });
 
-  gameProducts.push(freshListing);
   return { committed: true, listing: freshListing };
 };

@@ -2,7 +2,7 @@ import { PlayerSignInSchema } from "@/lib/validations/authSchemas";
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { getPlayerAccountByEmail } from "@/lib/db";
+import { createAuthSession, getPlayerAccountByEmail } from "@/lib/db";
 
 export const POST = async (request: Request) => {
   const requestBody = await request.json();
@@ -39,10 +39,13 @@ export const POST = async (request: Request) => {
     { expiresIn: "7d" }
   );
 
+  createAuthSession(resolvedAccount.id, sessionToken, Date.now() + 1000 * 60 * 60 * 24 * 7);
+
   const serverResponse = NextResponse.json({ sessionEstablished: true });
   serverResponse.cookies.set("gk_token", sessionToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
     maxAge: 60 * 60 * 24 * 7,
     path: "/",
   });
