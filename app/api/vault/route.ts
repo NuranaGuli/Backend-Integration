@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { gameProducts } from "@/lib/gameVault";
 import { z } from "zod";
+import { createGame, listGames } from "@/lib/db";
 
 const GameVaultEntrySchema = z.object({
   title: z.string().min(1, { message: "Game title must not be blank." }),
   retailPrice: z.number().positive({ message: "Retail price must exceed zero." }),
-  availableKeys: z.number().positive({ message: "Key count must be a positive integer." }),
+  availableKeys: z.number().int().positive({ message: "Key count must be a positive integer." }),
   genre: z.string().min(1, { message: "Genre field cannot be left empty." }),
   platform: z.string().min(1, { message: "Distribution platform is required." }),
   ageRating: z.string().min(1, { message: "Age rating is a mandatory field." }),
@@ -13,7 +13,7 @@ const GameVaultEntrySchema = z.object({
 });
 
 export const GET = async () => {
-  return NextResponse.json(gameProducts);
+  return NextResponse.json(listGames());
 };
 
 export const POST = async (request: Request) => {
@@ -27,11 +27,6 @@ export const POST = async (request: Request) => {
     );
   }
 
-  const newVaultEntry = {
-    id: `gp${gameProducts.length + 1}`,
-    ...validationOutcome.data,
-  };
-
-  gameProducts.push(newVaultEntry);
+  const newVaultEntry = createGame(validationOutcome.data);
   return NextResponse.json(newVaultEntry, { status: 201 });
 };

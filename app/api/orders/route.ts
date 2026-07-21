@@ -1,6 +1,6 @@
-import { purchaseOrders } from "@/lib/gameVault";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { createOrder, listOrders } from "@/lib/db";
 
 const OrderSubmissionSchema = z.object({
   gameId: z.string().min(1, { message: "A valid game identifier is required." }),
@@ -11,7 +11,7 @@ const OrderSubmissionSchema = z.object({
 });
 
 export const GET = async () => {
-  return NextResponse.json(purchaseOrders);
+  return NextResponse.json(listOrders());
 };
 
 export const POST = async (request: Request) => {
@@ -25,11 +25,6 @@ export const POST = async (request: Request) => {
     );
   }
 
-  const committedOrder = {
-    id: `po${purchaseOrders.length + 1}`,
-    ...schemaResult.data,
-  };
-
-  purchaseOrders.push(committedOrder);
+  const committedOrder = createOrder(schemaResult.data);
   return NextResponse.json(committedOrder, { status: 201 });
 };

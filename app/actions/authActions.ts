@@ -4,10 +4,10 @@ import {
   PlayerRegistrationSchema,
   PlayerSignInSchema,
 } from "@/lib/validations/authSchemas";
-import { playerAccounts } from "@/lib/gameVault";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { cookies } from "next/headers";
+import { createPlayerAccount, getPlayerAccountByEmail } from "@/lib/db";
 
 type RegistrationResult =
   | { registered: true }
@@ -24,6 +24,9 @@ type SignInResult =
 
 type SessionTerminationResult = { terminated: true };
 
+const getValidationViolations = (error: { issues: Array<{ message: string }> }) => {
+  return error.issues.map((issue) => issue.message);
+};
 
 export const executePlayerRegistration = async (
   formData: FormData
@@ -34,15 +37,13 @@ export const executePlayerRegistration = async (
   if (!validatedFields.success) {
     return {
       registered: false,
-      violations: validatedFields.error.errors.map((e) => e.message),
+      violations: getValidationViolations(validatedFields.error),
     };
   }
 
   const { playerEmail, securityKey } = validatedFields.data;
 
-  const accountConflict = playerAccounts.find(
-    (acc) => acc.playerEmail === playerEmail
-  );
+  const accountConflict = getPlayerAccountByEmail(playerEmail);
 
   if (accountConflict) {
     return {
@@ -53,18 +54,14 @@ export const executePlayerRegistration = async (
 
   const hashedSecurityKey = await bcrypt.hash(securityKey, 10);
 
-  const freshAccount = {
-    id: `pa${playerAccounts.length + 1}`,
+  createPlayerAccount({
     playerEmail,
     hashedSecurityKey,
-    accountTier: "player" as const,
-  };
-
-  playerAccounts.push(freshAccount);
+    accountTier: "player",
+  });
 
   return { registered: true };
 };
-
 
 export const executePlayerSignIn = async (
   formData: FormData
@@ -75,15 +72,13 @@ export const executePlayerSignIn = async (
   if (!validatedFields.success) {
     return {
       authenticated: false,
-      violations: validatedFields.error.errors.map((e) => e.message),
+      violations: getValidationViolations(validatedFields.error),
     };
   }
 
   const { playerEmail, securityKey } = validatedFields.data;
 
-  const resolvedAccount = playerAccounts.find(
-    (acc) => acc.playerEmail === playerEmail
-  );
+  const resolvedAccount = getPlayerAccountByEmail(playerEmail);
 
   if (!resolvedAccount) {
     return {
@@ -127,7 +122,6 @@ export const executePlayerSignIn = async (
     accountTier: resolvedAccount.accountTier,
   };
 };
-
 
 export const terminateActiveSession =
   async (): Promise<SessionTerminationResult> => {

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
-import { playerAccounts } from "@/lib/gameVault";
 import { cookies } from "next/headers";
+import { getPlayerAccountById } from "@/lib/db";
 
 export const GET = async (_request: Request) => {
   const cookieStore = await cookies();
@@ -28,9 +28,7 @@ export const GET = async (_request: Request) => {
     );
   }
 
-  const resolvedAccount = playerAccounts.find(
-    (acc) => acc.id === tokenPayload.accountId
-  );
+  const resolvedAccount = getPlayerAccountById(tokenPayload.accountId);
 
   if (!resolvedAccount) {
     return NextResponse.json(

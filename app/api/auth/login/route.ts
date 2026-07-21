@@ -1,8 +1,8 @@
-import { playerAccounts } from "@/lib/gameVault";
 import { PlayerSignInSchema } from "@/lib/validations/authSchemas";
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { getPlayerAccountByEmail } from "@/lib/db";
 
 export const POST = async (request: Request) => {
   const requestBody = await request.json();
@@ -17,7 +17,7 @@ export const POST = async (request: Request) => {
 
   const { playerEmail, securityKey } = schemaResult.data;
 
-  const resolvedAccount = playerAccounts.find((acc) => acc.playerEmail === playerEmail);
+  const resolvedAccount = getPlayerAccountByEmail(playerEmail);
   if (!resolvedAccount) {
     return NextResponse.json(
       { error: "No player account found for the given email address." },

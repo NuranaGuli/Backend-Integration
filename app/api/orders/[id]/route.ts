@@ -1,12 +1,12 @@
-import { purchaseOrders } from "@/lib/gameVault";
 import { NextResponse } from "next/server";
+import { deleteOrderById, getOrderById, updateOrderById } from "@/lib/db";
 
 export const GET = async (
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) => {
   const { id } = await params;
-  const locatedOrder = purchaseOrders.find((po) => po.id === id);
+  const locatedOrder = getOrderById(id);
 
   if (!locatedOrder) {
     return NextResponse.json(
@@ -23,26 +23,25 @@ export const PUT = async (
   { params }: { params: Promise<{ id: string }> }
 ) => {
   const { id } = await params;
-  const orderToAmend = purchaseOrders.find((po) => po.id === id);
-
-  if (!orderToAmend) {
-    return NextResponse.json(
-      { error: "Cannot amend — order record does not exist." },
-      { status: 404 }
-    );
-  }
 
   try {
     const amendmentData = await request.json();
-    Object.assign(orderToAmend, amendmentData);
+    const amendedOrder = updateOrderById(id, amendmentData);
+
+    if (!amendedOrder) {
+      return NextResponse.json(
+        { error: "Cannot amend — order record does not exist." },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(amendedOrder);
   } catch {
     return NextResponse.json(
       { error: "Malformed payload — JSON structure expected." },
       { status: 400 }
     );
   }
-
-  return NextResponse.json(orderToAmend);
 };
 
 export const DELETE = async (
@@ -50,18 +49,14 @@ export const DELETE = async (
   { params }: { params: Promise<{ id: string }> }
 ) => {
   const { id } = await params;
-  const orderToCancel = purchaseOrders.find((po) => po.id === id);
+  const removed = deleteOrderById(id);
 
-  if (!orderToCancel) {
+  if (!removed) {
     return NextResponse.json(
       { error: "Cancellation failed — no matching order record found." },
       { status: 404 }
     );
   }
 
-  const remainingOrders = purchaseOrders.filter((po) => po.id !== orderToCancel.id);
-  purchaseOrders.length = 0;
-  purchaseOrders.push(...remainingOrders);
-
-  return NextResponse.json({ cancelledOrderId: orderToCancel.id });
+  return NextResponse.json({ cancelledOrderId: id });
 };
